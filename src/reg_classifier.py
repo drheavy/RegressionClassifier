@@ -1,17 +1,8 @@
 import numpy as np
 import pandas as pd
 
-#from sklearn.base import BaseEstimator, ClassifierMixin
-
 from sklearn.linear_model import LogisticRegression
-
-#from sklearn.model_selection import train_test_split
-#from sklearn.preprocessing import StandardScaler
-
 from sklearn import metrics
-
-#import warnings
-#warnings.filterwarnings("ignore")
 
 
 class ClassRegressor():
@@ -74,11 +65,11 @@ class ClassRegressor():
             y_class_cur += 1
             bb_prev = bb
 
-        # FIT
-        self.model = LogisticRegression()
-
         if len(X_sorted) != len(y_classes):
             raise Exception('Different size of X and y lists for fitting')
+
+        # FIT
+        self.model = LogisticRegression()
 
         self.model.fit(X_sorted, y_classes)
 
@@ -213,6 +204,7 @@ def recur_func(X, Y, bins_numb, n_levels, cur_level, cur_class_full, level_class
 
         # Список индексов значений Y, попадающих в новый бин
         idx_list = []
+
         min_border = y_classes_borders_dict[cur_class][0]
         max_border = y_classes_borders_dict[cur_class][1]
 
