@@ -8,15 +8,15 @@ from sklearn import metrics
 class ClassRegressor():
     """Модель, делающая разбиение на бины одного уровня"""
 
-    def __init__(self, bins_numb=2):
+    def __init__(self, n_bins=2):
         """
         Инициализация
-        bins_numb - количество бинов, на которые делятся данные на каждом уровне
+        n_bins - количество бинов, на которые делятся данные на каждом уровне
         """
-        self.bins_numb = bins_numb
+        self.n_bins = n_bins
 
         # Словарь соответствия новых классов с соответствующими диапазонами таргета
-        self.y_classes_borders_dict = {}
+        self.bin_borders = {}
 
     def fit(self, X, y):
         """
@@ -30,52 +30,22 @@ class ClassRegressor():
         if isinstance(y, pd.Series):
             y = y.values
 
-        # Сортировка входных данных по возрастанию
-        idx_sorted = np.argsort(y)
-        y_sorted = y[idx_sorted]
-        X_sorted = X[idx_sorted]
+        bin_borders = np.histogram(y, bins=self.n_bins)[1]
 
-        # Расчёт границ набора бинов
-        bins_borders = np.histogram(y_sorted, bins=self.bins_numb)[1]
+        self.bin_borders = {i: [bin_borders[i], bin_borders[i+1]] for i in range(len(bin_borders)-1)}
 
-        # Счётчик текущего индекса
-        y_idx = 0
-        # Новый лейб текущего значения тергета
-        y_class_cur = 0
-        # Список с новыми лейблами
-        y_classes = []
-        # Предыдущая (левая) граница текущего бина
-        bb_prev = bins_borders[0]
-        # Является ли текущий бин последним в данной группе
-        is_last_border = False
+        # Hack for np.digitize
+        # to make sure the values that have exactly the same value as the left bin corner are included in the first bin
+        bin_borders[0] = bin_borders[0] - 1e-10 
+        self.y_classes = np.digitize(y, bin_borders, right=True) - 1
 
-        # Цикл с расчётом и сохранением списка новых лейблов и словаря соответствия лейбов и диапазонов исходного таргета
-        for bb in bins_borders[1:]:
+        self.model = LogisticRegression(class_weight='balanced')
 
-            if bb == bins_borders[-1]:
-                is_last_border = True
-
-            # Вторая часть условия - если последний бин не достигнут, то его правая граница не включается, и наоборот
-            while y_idx < len(y_sorted) and \
-                    ((not is_last_border and y_sorted[y_idx] < bb) or (is_last_border and y_sorted[y_idx] <= bb)):
-                y_classes.append(y_class_cur)
-                self.y_classes_borders_dict[y_class_cur] = [bb_prev, bb]
-                y_idx += 1
-
-            y_class_cur += 1
-            bb_prev = bb
-
-        if len(X_sorted) != len(y_classes):
-            raise Exception('Different size of X and y lists for fitting')
-
-        # FIT
-        self.model = LogisticRegression()
-
-        self.model.fit(X_sorted, y_classes)
+        self.model.fit(X, self.y_classes)
 
         return self
 
-    def predict(self, X):
+    def predict(self, X, regression=False):
         """
         Предиктор
         X - таблица с входными данными
@@ -85,28 +55,24 @@ class ClassRegressor():
             X = X.values
 
         # Список предсказанных лейблов
-        pred_list_class = self.model.predict(X)
+        pred = self.model.predict(X)
 
-        # Закомментированный блок - раскодировка лейблов в исходный формат таргета
-        # pred_list = []
-        # for pred_class in pred_list_class:
-        #    pred_borders = self.y_classes_borders_dict[pred_class]
-        #    pred_list.append((pred_borders[0] + pred_borders[1]) / 2)
-        # return pred_list_class
+        if regression:
+            pred = np.mean([self.bin_borders[y_class] for y_class in pred], axis=1)
 
-        return pred_list_class
+        return pred
 
 
 class ClassRegressorEnsemble():
     """Комплексная модель с ансамблем одноуровневых моделей классификации"""
 
-    def __init__(self, bins_numb=2, n_levels=2):
+    def __init__(self, n_bins=2, n_levels=2):
         """
         Инициализация
-        bins_numb - количество бинов, на которые делятся данные на каждом уровне
+        n_bins - количество бинов, на которые делятся данные на каждом уровне
         n_levels - количество уровней деления
         """
-        self.bins_numb = bins_numb
+        self.n_bins = n_bins
         self.n_levels = n_levels
         # Cловарь соответствия пары уровень-класс и обученной модели классификатора
         self.level_class_model_dict = {}
@@ -129,7 +95,7 @@ class ClassRegressorEnsemble():
         cur_class_full = [cur_class]
 
         # Запуск рекурсивной функции для заполнения словаря
-        self.level_class_model_dict = recur_func(X, Y, self.bins_numb, self.n_levels, cur_level, cur_class_full,
+        self.level_class_model_dict = recur_func(X, Y, self.n_bins, self.n_levels, cur_level, cur_class_full,
                                                  self.level_class_model_dict)
 
     def predict(self, X):
@@ -172,12 +138,12 @@ class ClassRegressorEnsemble():
         return pred_list
 
 
-def recur_func(X, Y, bins_numb, n_levels, cur_level, cur_class_full, level_class_model_dict):
+def recur_func(X, Y, n_bins, n_levels, cur_level, cur_class_full, level_class_model_dict):
     """
     Основная расчётная функция с рекурсивным обходом всех бинов
     X - таблица с входными данными
     y - столбец с таргет-переменной
-    bins_numb - количество бинов, на которые делятся данные на каждом уровне
+    n_bins - количество бинов, на которые делятся данные на каждом уровне
     n_levels - количество уровней деления
     cur_level - текущий уровень обхода
     cur_class_full - текущий класс бина
@@ -188,7 +154,7 @@ def recur_func(X, Y, bins_numb, n_levels, cur_level, cur_class_full, level_class
         return
 
     # Запускаем классификатор на текущем диапазоне Y
-    class_reg = ClassRegressor(bins_numb=bins_numb)
+    class_reg = ClassRegressor(n_bins=n_bins)
     class_reg.fit(X, Y)
 
     # Сохраняем словарь с границами бинов в локальную переменную
@@ -227,7 +193,7 @@ def recur_func(X, Y, bins_numb, n_levels, cur_level, cur_class_full, level_class
 
         # Если не достигнут последний уровень, снова запускаем рекурсивную функцию
         if cur_level < n_levels:
-            recur_func(cur_bin_X, cur_bin_Y, bins_numb, n_levels, cur_level + 1, cur_class_full_temp,
+            recur_func(cur_bin_X, cur_bin_Y, n_bins, n_levels, cur_level + 1, cur_class_full_temp,
                        level_class_model_dict)
 
     return level_class_model_dict
