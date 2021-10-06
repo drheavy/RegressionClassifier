@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn import metrics
 
 
@@ -36,7 +36,7 @@ class ClassRegressor():
 
         # Hack for np.digitize
         # to make sure the values that have exactly the same value as the left bin corner are included in the first bin
-        bin_borders[0] = bin_borders[0] - 1e-10 
+        bin_borders[0] = bin_borders[0] - 1e-10
         self.y_classes = np.digitize(y, bin_borders, right=True) - 1
 
         self.model = LogisticRegression()
@@ -73,8 +73,6 @@ class ClassRegressorEnsemble():
         """
         self.n_bins = n_bins
         self.n_levels = n_levels
-        # Cловарь соответствия пары уровень-класс и обученной модели классификатора
-        self.level_class_model_dict = {}
 
         self.models = {}
 
@@ -87,7 +85,8 @@ class ClassRegressorEnsemble():
         self.models[(level, bin_index, prev_model_key)] = model
 
         for i, (bin_class, bin_border) in enumerate(model.bin_borders.items()):
-            bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
+            bin_border[0] = bin_border[0] - 1e-10
+            bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
 
             X_subset, y_subset = X[bin_idx], y[bin_idx]
 
