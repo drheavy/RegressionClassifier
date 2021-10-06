@@ -106,6 +106,8 @@ class ClassRegressorEnsemble():
             bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
 
             X_subset, y_subset = X[bin_idx], y[bin_idx]
+            if len(y_subset) == 0:
+                continue
 
             self._fit_recur(
                 X_subset,
@@ -230,7 +232,10 @@ def bins_calc(y, n_bins=2, method='equal'):
         y = y.values
 
     if method == 'percentile':
-        bin_borders = pd.qcut(y, q=n_bins, labels=False, retbins=True)[1]
+        bin_borders = pd.qcut(y, q=n_bins, labels=False, retbins=True, precision=10, duplicates='drop')[1]
+        print('y: ', pd.Series(y).value_counts())
+        print('bin_borders: ', bin_borders)
+        print('n_bins: ', n_bins)
     elif method == 'equal':
         bin_borders = np.histogram(y, bins=n_bins)[1]
     else:
