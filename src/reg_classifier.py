@@ -232,7 +232,9 @@ def bins_calc(y, n_bins=2, method='equal'):
         y = y.values
 
     if method == 'percentile':
-        bin_borders = pd.qcut(y, q=n_bins, labels=False, retbins=True, precision=10, duplicates='drop')[1]
+        bin_borders = pd.qcut(y, q=n_bins, labels=False, retbins=True, duplicates='drop')[1]
+        if len(bin_borders) < 3:
+            bin_borders = bins_calc(y, n_bins=n_bins, method='equal')
     elif method == 'equal':
         bin_borders = np.histogram(y, bins=n_bins)[1]
     else:
