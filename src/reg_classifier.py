@@ -69,7 +69,7 @@ class ClassRegressor():
 class ClassRegressorEnsemble():
     """Комплексная модель с ансамблем одноуровневых моделей классификации"""
 
-    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=10, leaf_model=None):
+    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=1, leaf_model=None):
         """
         Инициализация
         n_bins - количество бинов, на которые делятся данные на каждом уровне
@@ -90,6 +90,7 @@ class ClassRegressorEnsemble():
     def _fit_recur(self, X, y, level, bin_index):
         bin_index_tuple = tuple(bin_index)
 
+        # Если достигнут листовой бин
         if level >= self.n_levels or len(y) < self.leaf_size or min(y) == max(y):
             if self.leaf_model:
                 model_reg = self.leaf_model()
@@ -159,7 +160,7 @@ class ClassRegressorEnsemble():
 class ClassRegressorEnsembleLog():
     """Внешний класс для ClassRegressorEnsemble, преобразующий таргет в симметричное распределение и обратно"""
 
-    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=10, leaf_model=None):
+    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=1, leaf_model=None):
         """
         Инициализация
         n_bins - количество бинов, на которые делятся данные на каждом уровне
@@ -175,27 +176,26 @@ class ClassRegressorEnsembleLog():
         self.leaf_model = leaf_model
 
     def fit(self, X, y):
-        # В данном методе вычисляется сумма бинов левой и правой частей гистограммы, после чего для таргет-переменной
+        # В данном методе вычисляется сумма левой и правой частей гистограммы, после чего для таргет-переменной
         #       применяется логарифмическое или экспоненциальное преобразование
-        HIST_BINS_NUMB = 10
-        hist_bins_left = int(HIST_BINS_NUMB / 2)
+        y_mid = (y.max() - y.min()) / 2 + y.min()
 
-        hist_left_sum = np.sum(np.histogram(y)[0][:hist_bins_left])
-        hist_right_sum = np.sum(np.histogram(y)[0][hist_bins_left:])
+        left_sum = len(y[y <= y_mid])
+        right_sum = len(y[y > y_mid])
 
-        HIST_HALFS_DIFF_MAX = 1.3
+        SUMS_DIFF_MAX = 1.3
 
         self.class_reg_ens = ClassRegressorEnsemble(n_bins=self.n_bins, n_levels=self.n_levels,
                                                     bins_calc_method=self.bins_calc_method, leaf_size=self.leaf_size,
                                                     leaf_model=self.leaf_model)
 
-        if hist_left_sum / hist_right_sum > HIST_HALFS_DIFF_MAX:
+        if right_sum == 0 or left_sum / right_sum > SUMS_DIFF_MAX:
             self.log_exp = 'log'
 
             # Добавить проверку на нули в таргете
             self.class_reg_ens.fit(X, np.log(y))
 
-        elif hist_right_sum / hist_left_sum > HIST_HALFS_DIFF_MAX:
+        elif left_sum == 0 or right_sum / left_sum > SUMS_DIFF_MAX:
             self.log_exp = 'exp'
 
             self.class_reg_ens.fit(X, np.exp(y))
