@@ -40,8 +40,11 @@ class ClassRegressor():
 
         # Hack for np.digitize
         # to make sure the values that have exactly the same value as the left bin corner are included in the first bin
-        bin_borders[0] = bin_borders[0] - 1e-10
-        self.y_classes = np.digitize(y, bin_borders, right=True) - 1
+        # bin_borders[0] = bin_borders[0] - 1e-10
+        # self.y_classes = np.digitize(y, bin_borders, right=True) - 1
+
+        # ↑↑↑ - Inaccurate calculation of bins borders for level >= 2
+        self.y_classes = pd.cut(y, bins=self.n_bins, labels=False, include_lowest=True)
 
         self.model = LogisticRegression()
 
@@ -103,8 +106,12 @@ class ClassRegressorEnsemble():
         self.models[(level, bin_index_tuple)] = model
 
         for i, (bin_class, bin_border) in enumerate(model.bin_borders.items()):
-            bin_border[0] = bin_border[0] - 1e-10
-            bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
+            # bin_border[0] = bin_border[0] - 1e-10
+            # bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
+            if i > 0:
+                bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
+            else:
+                bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
 
             X_subset, y_subset = X[bin_idx], y[bin_idx]
             if len(y_subset) == 0:
@@ -135,6 +142,7 @@ class ClassRegressorEnsemble():
         if isinstance(X, pd.DataFrame):
             X = X.values
         pred = np.empty((X.shape[0], ))
+
         for i, x in enumerate(X):
             cur_level = 0
             cur_bin = tuple([0])
@@ -151,74 +159,12 @@ class ClassRegressorEnsemble():
                     if self.leaf_model and (cur_level, cur_bin) in self.models_reg:
                         pred[i] = self.models_reg[(cur_level, cur_bin)].predict([x])[0]
                     else:
+                        # Pulling out the last bin number from a tuple
                         pred[i] = np.mean(clf.bin_borders[cur_bin[-1]])
                     break
 
         return pred
 
-
-class ClassRegressorEnsembleLog():
-    """Внешний класс для ClassRegressorEnsemble, преобразующий таргет в симметричное распределение и обратно"""
-
-    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=1, leaf_model=None):
-        """
-        Инициализация
-        n_bins - количество бинов, на которые делятся данные на каждом уровне
-        n_levels - количество уровней деления
-        bins_calc_method - метод разделения таргет-переменной на бины ('equal', 'percentile')
-        leaf_size - минимальный размер листового (неделимого) бина
-        leaf_model - модель регрессора для предсказаний на листовых бинах
-        """
-        self.n_bins = n_bins
-        self.n_levels = n_levels
-        self.bins_calc_method = bins_calc_method
-        self.leaf_size = leaf_size
-        self.leaf_model = leaf_model
-
-    def fit(self, X, y):
-        # В данном методе вычисляется сумма левой и правой частей гистограммы, после чего для таргет-переменной
-        #       применяется логарифмическое или экспоненциальное преобразование
-        y_mid = (y.max() - y.min()) / 2 + y.min()
-
-        left_sum = len(y[y <= y_mid])
-        right_sum = len(y[y > y_mid])
-
-        SUMS_DIFF_MAX = 1.3
-
-        self.class_reg_ens = ClassRegressorEnsemble(n_bins=self.n_bins, n_levels=self.n_levels,
-                                                    bins_calc_method=self.bins_calc_method, leaf_size=self.leaf_size,
-                                                    leaf_model=self.leaf_model)
-
-        if right_sum == 0 or left_sum / right_sum > SUMS_DIFF_MAX:
-            self.log_exp = 'log'
-
-            # Добавить проверку на нули в таргете
-            self.class_reg_ens.fit(X, np.log(y))
-
-        elif left_sum == 0 or right_sum / left_sum > SUMS_DIFF_MAX:
-            self.log_exp = 'exp'
-
-            self.class_reg_ens.fit(X, np.exp(y))
-
-        else:
-            self.log_exp = 'norm'
-
-            self.class_reg_ens.fit(X, y)
-
-    def predict(self, X):
-        # Преобразование таргет переменной, обратное тому, которое было выполнено в методе fit
-        if self.log_exp == 'log':
-            pred = self.class_reg_ens.predict(X)
-            return np.exp(pred)
-
-        elif self.log_exp == 'exp':
-            pred = self.class_reg_ens.predict(X)
-            # Добавить проверку на нули в предиктах
-            return np.log(pred)
-
-        else:
-            pred = self.class_reg_ens.predict(X)
-            return pred
 
 def bins_calc(y, n_bins=2, method='equal'):
     """
