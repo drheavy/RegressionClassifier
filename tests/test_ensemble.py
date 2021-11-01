@@ -15,9 +15,9 @@ class TestEnsemble:
 
         print(model.models)
         assert len(model.models) == 3
-        assert model.models[(0, 0, None)].predict(X).tolist() == [0, 0, 1, 1]
-        assert model.models[(1, 0, (0, 0))].predict(X).tolist() == [0, 1, 1, 1]
-        assert model.models[(1, 1, (0, 0))].predict(X).tolist() == [0, 0, 0, 1]
+        assert model.models[(0, (0,))].predict(X).tolist() == [0, 0, 1, 1]
+        assert model.models[(1, (0, 0))].predict(X).tolist() == [0, 1, 1, 1]
+        assert model.models[(1, (0, 1))].predict(X).tolist() == [0, 0, 0, 1]
 
         assert model.predict(X).tolist() == y
 
