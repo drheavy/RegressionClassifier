@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn.dummy import DummyRegressor
 from sklearn.metrics import mean_absolute_error
 
@@ -54,4 +55,30 @@ class TestClassRegressor:
         assert train_mae <= dummy_train_mae
         assert test_mae <= dummy_test_mae
 
+    def test_classes_are_classes(self, airbnb_split):
+        X_train_scaled, X_test_scaled, y_train, y_test = airbnb_split
+        N_BINS = 10
+        clf = ClassRegressor(n_bins=N_BINS)
+        clf.fit(X_train_scaled, y_train)
+
+        classes_list = clf.y_classes.tolist()
+        assert min(classes_list) == 0
+        assert max(classes_list) == N_BINS-1
+        assert classes_list == [int(classes_list) for classes_list in classes_list]
+
+        pred_test_classes = clf.predict(X_test_scaled)
+        pred_classes_list = np.unique(pred_test_classes).tolist()
+        assert min(pred_classes_list) >= 0
+        assert max(pred_classes_list) <= N_BINS-1
+        assert pred_classes_list == [int(pred_classes_list) for pred_classes_list in pred_classes_list]
+
+    def test_bins_equal(self):
+        clf = ClassRegressor(n_bins=2)
+
+        X = [[1], [2], [3], [9]]
+        y = [1, 2, 3, 9]
+
+        clf.fit(X, y)
+
+        assert clf.bin_borders.tolist() == [[1.0, 5.0], [5.0, 9.0]]
 
