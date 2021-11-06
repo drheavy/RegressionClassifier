@@ -31,7 +31,8 @@ class ClassRegressorEnsemble:
 
         bin_index_tuple = tuple(bin_index)
 
-        if level >= self.n_levels or len(y) < self.leaf_size or min(y) == max(y):
+        y_uniq = len(np.unique(y))
+        if level >= self.n_levels or len(y) < self.leaf_size or y_uniq < self.n_bins:
             if self.leaf_model:
                 model_reg = self.leaf_model()
                 model_reg.fit(X, y)
