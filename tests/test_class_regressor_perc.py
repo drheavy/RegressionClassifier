@@ -1,11 +1,11 @@
 import numpy as np
 from sklearn.dummy import DummyRegressor
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from regression_classifier import ClassRegressor
 
 
-class TestClassRegressor:
+class TestClassRegressorPrecentile:
     def test_fit_two_bins(self):
         clf = ClassRegressor(n_bins=2, bins_calc_method='percentile')
 
@@ -20,7 +20,7 @@ class TestClassRegressor:
         assert clf.predict(X).tolist() == [0, 1]
         assert clf.predict(X, regression=True).tolist() == [1, 2]
 
-    def test_fit_three_bins(self):
+    def test_fit_three_bins_(self):
         clf = ClassRegressor(n_bins=3, bins_calc_method='percentile')
 
         X = [[1], [2], [3]]
@@ -82,4 +82,25 @@ class TestClassRegressor:
 
         assert clf.bin_borders.tolist() == [[1.0, 2.5], [2.5, 9.0]]
 
+    def test_perc_better_than_equal(self, airbnb_split):
+        X_train_scaled, X_test_scaled, y_train, y_test = airbnb_split
+
+        clf_eq = ClassRegressor(n_bins=2, bins_calc_method='equal')
+        clf_eq.fit(X_train_scaled, y_train)
+
+        pred_train_eq = clf_eq.predict(X_train_scaled, regression=True)
+        pred_test_eq = clf_eq.predict(X_test_scaled, regression=True)
+        train_mse_eq = mean_squared_error(y_train, pred_train_eq)
+        test_mse_eq = mean_squared_error(y_test, pred_test_eq)
+
+        clf_perc = ClassRegressor(n_bins=2, bins_calc_method='percentile')
+        clf_perc.fit(X_train_scaled, y_train)
+
+        pred_train_perc = clf_perc.predict(X_train_scaled, regression=True)
+        pred_test_perc = clf_perc.predict(X_test_scaled, regression=True)
+        train_mse_perc = mean_squared_error(y_train, pred_train_perc)
+        test_mse_perc = mean_squared_error(y_test, pred_test_perc)
+
+        assert train_mse_perc < train_mse_eq
+        assert test_mse_perc < test_mse_eq
 
