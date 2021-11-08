@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.dummy import DummyRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error
 
 from regression_classifier import ClassRegressor
@@ -82,3 +83,20 @@ class TestClassRegressor:
 
         assert clf.bin_borders.tolist() == [[1.0, 5.0], [5.0, 9.0]]
 
+    def test_linreg_is_better_than_none(self):
+        X = np.array(list(range(100))).reshape(-1, 1).tolist()
+        y = list(range(100))
+
+        clf = ClassRegressor(n_bins=5)
+        clf.fit(X, y)
+
+        pred_train = clf.predict(X, regression=True)
+        train_mae = mean_absolute_error(y, pred_train)
+
+        clf_linreg = ClassRegressor(n_bins=5, leaf_model=LinearRegression)
+        clf_linreg.fit(X, y)
+
+        pred_train_linreg = clf_linreg.predict(X, regression=True)
+        train_mae_linreg = mean_absolute_error(y, pred_train_linreg)
+
+        assert train_mae_linreg < train_mae
