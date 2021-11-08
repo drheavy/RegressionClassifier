@@ -7,7 +7,7 @@ from regression_classifier import ClassRegressor
 
 class TestClassRegressor:
     def test_fit_two_bins(self):
-        clf = ClassRegressor(n_bins=2)
+        clf = ClassRegressor(n_bins=2, bins_calc_method='percentile')
 
         X = [[1], [2]]
         y = [1, 2]
@@ -21,7 +21,7 @@ class TestClassRegressor:
         assert clf.predict(X, regression=True).tolist() == [1, 2]
 
     def test_fit_three_bins(self):
-        clf = ClassRegressor(n_bins=3)
+        clf = ClassRegressor(n_bins=3, bins_calc_method='percentile')
 
         X = [[1], [2], [3]]
         y = [1, 2, 3]
@@ -36,7 +36,7 @@ class TestClassRegressor:
 
     def test_better_than_dummy(self, airbnb_split):
         X_train_scaled, X_test_scaled, y_train, y_test = airbnb_split
-        clf = ClassRegressor(n_bins=2)
+        clf = ClassRegressor(n_bins=2, bins_calc_method='percentile')
         clf.fit(X_train_scaled, y_train)
 
         pred_train = clf.predict(X_train_scaled, regression=True)
@@ -72,13 +72,14 @@ class TestClassRegressor:
         assert max(pred_classes_list) <= N_BINS-1
         assert pred_classes_list == [int(pred_classes_list) for pred_classes_list in pred_classes_list]
 
-    def test_bins_equal(self):
-        clf = ClassRegressor(n_bins=2)
+    def test_bins_perc(self):
+        clf = ClassRegressor(n_bins=2, bins_calc_method='percentile')
 
         X = [[1], [2], [3], [9]]
         y = [1, 2, 3, 9]
 
         clf.fit(X, y)
 
-        assert clf.bin_borders.tolist() == [[1.0, 5.0], [5.0, 9.0]]
+        assert clf.bin_borders.tolist() == [[1.0, 2.5], [2.5, 9.0]]
+
 
