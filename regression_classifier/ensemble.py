@@ -21,8 +21,6 @@ class ClassRegressorEnsemble:
         self.bins_calc_method = bins_calc_method
         self.leaf_size = leaf_size
         self.leaf_model = leaf_model
-        # Cловарь соответствия пары уровень-класс и обученной модели классификатора
-        # self.level_class_model_dict = {}
 
         self.models = {}
         self.models_reg = {}
@@ -32,21 +30,24 @@ class ClassRegressorEnsemble:
         bin_index_tuple = tuple(bin_index)
 
         y_uniq = len(np.unique(y))
+        leaf_model = None
+        is_leaf = None
+
         if level >= self.n_levels or len(y) < self.leaf_size or y_uniq < self.n_bins:
             if self.leaf_model:
-                model_reg = self.leaf_model()
-                model_reg.fit(X, y)
-                self.models_reg[(level, bin_index_tuple)] = model_reg
-            return
+                leaf_model = self.leaf_model
+                is_leaf = True
+            else:
+                return
 
-        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method)
+        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method, leaf_model=leaf_model)
         model.fit(X, y)
-        # self.models[(level, bin_index, prev_model_key)] = model
         self.models[(level, bin_index_tuple)] = model
 
-        # for i, (bin_class, bin_border) in enumerate(model.bin_borders.items()):
+        if is_leaf:
+            return
+
         for i, bin_border in enumerate(model.bin_borders):
-            # bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
             if i > 0:
                 bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
             else:
@@ -88,23 +89,21 @@ class ClassRegressorEnsemble:
 
         pred = np.empty((X.shape[0], ))
         for i, x in enumerate(X):
-            # prev_model_key = None
             cur_level = 0
             cur_bin = tuple([0])
             clf = None
 
             while cur_level <= self.n_levels:
-                # if (cur_level, cur_bin, prev_model_key) in self.models:
                 if (cur_level, cur_bin) in self.models:
                     clf = self.models[(cur_level, cur_bin)]
-                    predicted_class = clf.predict([x])[0]
 
-                    # prev_model_key = (cur_level, cur_bin)
+                if (cur_level, cur_bin) in self.models and not self.models[(cur_level, cur_bin)].leaf_model:
+                    predicted_class = clf.predict([x])[0]
                     cur_level += 1
                     cur_bin += (predicted_class,)
                 else:
-                    if self.leaf_model and (cur_level, cur_bin) in self.models_reg:
-                        pred[i] = self.models_reg[(cur_level, cur_bin)].predict([x])[0]
+                    if (cur_level, cur_bin) in self.models or clf.leaf_model:
+                        pred[i] = clf.predict([x])[0]
                     else:
                         pred[i] = clf.predict([x], regression=True)[0]
                     break

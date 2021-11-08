@@ -7,16 +7,17 @@ from .utils import bins_calc
 
 
 class ClassRegressor:
-    def __init__(self, n_bins=2, bins_calc_method='equal'):
+    def __init__(self, n_bins=2, bins_calc_method='equal', leaf_model=None):
         """
         Инициализация
         n_bins - количество бинов, на которые делятся данные на каждом уровне
         bins_calc_method - метод разделения таргет-переменной на бины ('equal', 'percentile')
+        leaf_model - модель регрессии на листовых бинах
         """
         self.n_bins = n_bins
         self.bins_calc_method = bins_calc_method
+        self.leaf_model = leaf_model
 
-        # Словарь соответствия новых классов с соответствующими диапазонами таргета
         self.bin_borders = np.zeros((n_bins, 2))
         self.bin_predictions = np.zeros((n_bins, ))
 
@@ -35,23 +36,24 @@ class ClassRegressor:
         X = np.array(X)
         y = np.array(y)
 
-        # bin_edges = np.histogram_bin_edges(y, bins=self.n_bins)
-        bin_edges = bins_calc(y, n_bins=self.n_bins, method=self.bins_calc_method)
+        if self.leaf_model:
+            self.model = self.leaf_model()
+            self.model.fit(X, y)
+        else:
+            bin_edges = bins_calc(y, n_bins=self.n_bins, method=self.bins_calc_method)
 
-        for i in range(len(bin_edges) - 1):
-            self.bin_borders[i] = np.array([bin_edges[i], bin_edges[i+1]])
+            for i in range(len(bin_edges) - 1):
+                self.bin_borders[i] = np.array([bin_edges[i], bin_edges[i+1]])
 
-        # bin_edges[0] = bin_edges[0] - 1e-10
-        # self.y_classes = np.digitize(y, bin_edges, right=True) - 1
-        self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
+            self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
 
-        for label, _ in enumerate(self.bin_borders):
-            bin_y = y[np.nonzero((self.y_classes == label).astype(int))]
-            # bin_y = y[self.y_classes == label]
-            self.bin_predictions[label] = np.mean(bin_y)
-        self.model = LogisticRegression()
+            for label, _ in enumerate(self.bin_borders):
+                bin_y = y[np.nonzero((self.y_classes == label).astype(int))]
+                # bin_y = y[self.y_classes == label]
+                self.bin_predictions[label] = np.mean(bin_y)
 
-        self.model.fit(X, self.y_classes)
+            self.model = LogisticRegression()
+            self.model.fit(X, self.y_classes)
 
         return self
 
@@ -67,7 +69,7 @@ class ClassRegressor:
 
         pred = self.model.predict(X)
 
-        if regression:
+        if regression and not self.leaf_model:
             pred = self.bin_predictions[pred]
 
         return pred
