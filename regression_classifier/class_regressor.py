@@ -48,8 +48,7 @@ class ClassRegressor:
             self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
 
             for label, _ in enumerate(self.bin_borders):
-                bin_y = y[np.nonzero((self.y_classes == label).astype(int))]
-                # bin_y = y[self.y_classes == label]
+                bin_y = y[self.y_classes == label]
                 self.bin_predictions[label] = np.mean(bin_y)
 
             self.model = LogisticRegression()
