@@ -20,6 +20,7 @@ class ClassRegressor:
 
         self.bin_borders = np.zeros((n_bins, 2))
         self.bin_predictions = np.zeros((n_bins, ))
+        self.leaf_model_ex = {}
 
     def fit(self, X, y):
         """
@@ -36,23 +37,24 @@ class ClassRegressor:
         X = np.array(X)
         y = np.array(y)
 
-        if self.leaf_model:
-            self.model = self.leaf_model()
-            self.model.fit(X, y)
-        else:
-            bin_edges = bins_calc(y, n_bins=self.n_bins, method=self.bins_calc_method)
+        bin_edges = bins_calc(y, n_bins=self.n_bins, method=self.bins_calc_method)
 
-            for i in range(len(bin_edges) - 1):
-                self.bin_borders[i] = np.array([bin_edges[i], bin_edges[i+1]])
+        for i in range(len(bin_edges) - 1):
+            self.bin_borders[i] = np.array([bin_edges[i], bin_edges[i+1]])
 
-            self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
+        self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
 
-            for label, _ in enumerate(self.bin_borders):
-                bin_y = y[self.y_classes == label]
+        for label, _ in enumerate(self.bin_borders):
+            bin_y = y[self.y_classes == label]
+            if not self.leaf_model:
                 self.bin_predictions[label] = np.mean(bin_y)
+            else:
+                bin_X = X[self.y_classes == label]
+                self.leaf_model_ex[label] = self.leaf_model()
+                self.leaf_model_ex[label].fit(bin_X, bin_y)
 
-            self.model = LogisticRegression()
-            self.model.fit(X, self.y_classes)
+        self.model = LogisticRegression()
+        self.model.fit(X, self.y_classes)
 
         return self
 
@@ -68,7 +70,10 @@ class ClassRegressor:
 
         pred = self.model.predict(X)
 
-        if regression and not self.leaf_model:
-            pred = self.bin_predictions[pred]
+        if regression:
+            if not self.leaf_model:
+                pred = self.bin_predictions[pred]
+            else:
+                pred = [self.leaf_model_ex[p].predict(X[i].reshape(1, -1)) for i, p in enumerate(pred)]
 
         return pred

@@ -23,7 +23,6 @@ class ClassRegressorEnsemble:
         self.leaf_model = leaf_model
 
         self.models = {}
-        self.models_reg = {}
 
     def _fit_recur(self, X, y, level, bin_index):
 
@@ -31,14 +30,12 @@ class ClassRegressorEnsemble:
 
         y_uniq = len(np.unique(y))
         leaf_model = None
-        is_leaf = None
+        is_leaf = False
 
-        if level >= self.n_levels or len(y) < self.leaf_size or y_uniq < self.n_bins:
+        if level >= self.n_levels-1 or len(y) < self.leaf_size or y_uniq < self.n_bins:
+            is_leaf = True
             if self.leaf_model:
                 leaf_model = self.leaf_model
-                is_leaf = True
-            else:
-                return
 
         model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method, leaf_model=leaf_model)
         model.fit(X, y)
@@ -62,7 +59,6 @@ class ClassRegressorEnsemble:
                 y_subset, 
                 level=level+1, 
                 bin_index=bin_index_tuple + (i,),
-                # prev_model_key=(level, bin_index),
             )
 
     def fit(self, X, y):
@@ -96,16 +92,11 @@ class ClassRegressorEnsemble:
             while cur_level <= self.n_levels:
                 if (cur_level, cur_bin) in self.models:
                     clf = self.models[(cur_level, cur_bin)]
-
-                if (cur_level, cur_bin) in self.models and not self.models[(cur_level, cur_bin)].leaf_model:
                     predicted_class = clf.predict([x])[0]
                     cur_level += 1
                     cur_bin += (predicted_class,)
                 else:
-                    if (cur_level, cur_bin) in self.models or clf.leaf_model:
-                        pred[i] = clf.predict([x])[0]
-                    else:
-                        pred[i] = clf.predict([x], regression=True)[0]
+                    pred[i] = clf.predict([x], regression=True)[0]
                     break
 
         return pred
