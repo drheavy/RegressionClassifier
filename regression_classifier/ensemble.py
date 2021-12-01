@@ -21,32 +21,30 @@ class ClassRegressorEnsemble:
         self.bins_calc_method = bins_calc_method
         self.leaf_size = leaf_size
         self.leaf_model = leaf_model
-        # Cловарь соответствия пары уровень-класс и обученной модели классификатора
-        # self.level_class_model_dict = {}
 
         self.models = {}
-        self.models_reg = {}
 
     def _fit_recur(self, X, y, level, bin_index):
 
         bin_index_tuple = tuple(bin_index)
 
         y_uniq = len(np.unique(y))
-        if level >= self.n_levels or len(y) < self.leaf_size or y_uniq < self.n_bins:
-            if self.leaf_model:
-                model_reg = self.leaf_model()
-                model_reg.fit(X, y)
-                self.models_reg[(level, bin_index_tuple)] = model_reg
-            return
+        leaf_model = None
+        is_leaf = False
 
-        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method)
+        if level >= self.n_levels-1 or len(y) < self.leaf_size or y_uniq < self.n_bins:
+            is_leaf = True
+            if self.leaf_model:
+                leaf_model = self.leaf_model
+
+        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method, leaf_model=leaf_model)
         model.fit(X, y)
-        # self.models[(level, bin_index, prev_model_key)] = model
         self.models[(level, bin_index_tuple)] = model
 
-        # for i, (bin_class, bin_border) in enumerate(model.bin_borders.items()):
+        if is_leaf:
+            return
+
         for i, bin_border in enumerate(model.bin_borders):
-            # bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
             if i > 0:
                 bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
             else:
@@ -61,7 +59,6 @@ class ClassRegressorEnsemble:
                 y_subset, 
                 level=level+1, 
                 bin_index=bin_index_tuple + (i,),
-                # prev_model_key=(level, bin_index),
             )
 
     def fit(self, X, y):
@@ -88,25 +85,18 @@ class ClassRegressorEnsemble:
 
         pred = np.empty((X.shape[0], ))
         for i, x in enumerate(X):
-            # prev_model_key = None
             cur_level = 0
             cur_bin = tuple([0])
             clf = None
 
             while cur_level <= self.n_levels:
-                # if (cur_level, cur_bin, prev_model_key) in self.models:
                 if (cur_level, cur_bin) in self.models:
                     clf = self.models[(cur_level, cur_bin)]
                     predicted_class = clf.predict([x])[0]
-
-                    # prev_model_key = (cur_level, cur_bin)
                     cur_level += 1
                     cur_bin += (predicted_class,)
                 else:
-                    if self.leaf_model and (cur_level, cur_bin) in self.models_reg:
-                        pred[i] = self.models_reg[(cur_level, cur_bin)].predict([x])[0]
-                    else:
-                        pred[i] = clf.predict([x], regression=True)[0]
+                    pred[i] = clf.predict([x], regression=True)[0]
                     break
 
         return pred

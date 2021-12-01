@@ -21,7 +21,7 @@ def bins_calc(y, n_bins=2, method='equal'):
     elif method == 'equal':
         bin_borders = np.histogram_bin_edges(y, bins=n_bins)
     else:
-        return False
+        raise Exception("Unknown method")
 
     return bin_borders
 
