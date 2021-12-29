@@ -6,7 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from .utils import bins_calc
 
 
-class ClassRegressor:
+class ClassRegressor():
     def __init__(self, n_bins=2, bins_calc_method='equal', leaf_model=None):
         """
         Инициализация
@@ -77,3 +77,63 @@ class ClassRegressor:
                 pred = [self.leaf_model_ex[p].predict(X[i].reshape(1, -1)) for i, p in enumerate(pred)]
 
         return pred
+
+
+class ClassRegressorOnelevel(ClassRegressor):
+    """Модель, делающая разбиение на бины одного уровня"""
+
+    def __init__(self, bin_edges, leaf_model=None):
+        """
+        Инициализация
+        bin_edges - граница для деления данных на 2 бина
+        leaf_model - модель регрессии на листовых бинах
+        """
+        self.bin_edges = bin_edges
+        self.leaf_model = leaf_model
+
+        self.bin_borders = {}
+        self.bin_predictions = np.zeros((2, ))
+        self.leaf_model_ex = {}
+
+    def fit(self, X, y):
+        """
+        Обучение модели
+        X - таблица с входными данными
+        y - столбец с таргет-переменной
+        """
+
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+        if isinstance(y, pd.Series):
+            y = y.values
+
+        X = np.array(X)
+        y = np.array(y)
+
+        for i in range(len(self.bin_edges) - 1):
+            self.bin_borders[i] = np.array([self.bin_edges[i], self.bin_edges[i+1]])
+
+        # bin_idx = ((y > self.bin_edges[0]) & (y <= self.bin_edges[2]))
+        # X, y = X[bin_idx], y[bin_idx]
+
+        self.y_classes = np.digitize(y, self.bin_edges, right=True) - 1
+
+        if not self.leaf_model:
+            # self.bin_predictions = self.bin_edges[1]
+            # self.bin_predictions[0] = np.mean([self.bin_edges[0], self.bin_edges[1]])
+            # self.bin_predictions[1] = np.mean([self.bin_edges[1], self.bin_edges[2]])
+            self.bin_predictions[0] = self.bin_edges[1]
+            self.bin_predictions[1] = self.bin_edges[1]
+        else:
+            for label in [0, 1]:
+                bin_y = y[self.y_classes == label]
+                bin_X = X[self.y_classes == label]
+                self.leaf_model_ex[label] = self.leaf_model()
+                self.leaf_model_ex[label].fit(bin_X, bin_y)
+
+        self.model = LogisticRegression()
+        # self.model = LGBMClassifier()
+
+        self.model.fit(X, self.y_classes)
+
+        return self
