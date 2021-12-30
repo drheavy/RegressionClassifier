@@ -7,7 +7,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from regression_classifier import ClassRegressorOnelevel, ClassRegressorOnelevelEnsemble, ClassRegressorEnsemble
 
 
-class TestClassRegressor:
+class TestOnelevelEnsemble:
     @pytest.mark.parametrize("bins_calc_method", ['equal', 'percentile'])
     def test_fit_two_bins_two_levels(self, bins_calc_method):
         X = [[1], [2]]
