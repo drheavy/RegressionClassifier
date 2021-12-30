@@ -7,6 +7,7 @@ from .utils import bins_calc
 
 
 class ClassRegressor():
+    """Модель, обучающая классификатор по заданным границам таргета"""
     def __init__(self, n_bins=2, bins_calc_method='equal', leaf_model=None):
         """
         Инициализация
@@ -80,7 +81,7 @@ class ClassRegressor():
 
 
 class ClassRegressorOnelevel(ClassRegressor):
-    """Модель, делающая разбиение на бины одного уровня"""
+    """Модель, обучающая бинарный классификатор по заданной границе таргета"""
 
     def __init__(self, bin_edges, leaf_model=None):
         """
@@ -113,15 +114,9 @@ class ClassRegressorOnelevel(ClassRegressor):
         for i in range(len(self.bin_edges) - 1):
             self.bin_borders[i] = np.array([self.bin_edges[i], self.bin_edges[i+1]])
 
-        # bin_idx = ((y > self.bin_edges[0]) & (y <= self.bin_edges[2]))
-        # X, y = X[bin_idx], y[bin_idx]
-
         self.y_classes = np.digitize(y, self.bin_edges, right=True) - 1
 
         if not self.leaf_model:
-            # self.bin_predictions = self.bin_edges[1]
-            # self.bin_predictions[0] = np.mean([self.bin_edges[0], self.bin_edges[1]])
-            # self.bin_predictions[1] = np.mean([self.bin_edges[1], self.bin_edges[2]])
             self.bin_predictions[0] = self.bin_edges[1]
             self.bin_predictions[1] = self.bin_edges[1]
         else:
@@ -132,7 +127,6 @@ class ClassRegressorOnelevel(ClassRegressor):
                 self.leaf_model_ex[label].fit(bin_X, bin_y)
 
         self.model = LogisticRegression()
-        # self.model = LGBMClassifier()
 
         self.model.fit(X, self.y_classes)
 

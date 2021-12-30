@@ -106,7 +106,7 @@ class ClassRegressorEnsemble():
 
 
 class ClassRegressorOnelevelEnsemble():
-    """Комплексная модель с ансамблем одноуровневых моделей классификации"""
+    """Комплексная модель, состоящая из ансамбля бинарных моделей классификации с переменной границей между классами"""
 
     def __init__(self, n_bins=100, bins_calc_method='equal', leaf_model=None):
         """
@@ -139,7 +139,6 @@ class ClassRegressorOnelevelEnsemble():
 
         for bin_i, bin_border in enumerate(self.bin_edges[1:-1]):
             bin_edges = np.array([self.bin_edges[0], bin_border, self.bin_edges[-1]])
-            # bin_edges = np.array([self.bin_edges[bin_i], bin_border, self.bin_edges[bin_i+2]])
 
             model = ClassRegressorOnelevel(bin_edges=bin_edges, leaf_model=self.leaf_model)
             model.fit(X, y)
