@@ -36,6 +36,9 @@ class ClassRegressorEnsemble():
         is_leaf = False
 
         if level >= self.n_levels-1 or len(y) < self.leaf_size or y_uniq < self.n_bins:
+            if y_uniq < 2:
+                return
+
             is_leaf = True
             if self.leaf_model:
                 leaf_model = self.leaf_model
