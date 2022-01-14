@@ -19,7 +19,7 @@ class ClassRegressor():
         self.bins_calc_method = bins_calc_method
         self.leaf_model = leaf_model
 
-        self.bin_borders = np.zeros((n_bins, 2))
+        # self.bin_borders = np.zeros((n_bins, 2))
         self.bin_predictions = np.zeros((n_bins, ))
         self.leaf_model_ex = {}
 
@@ -39,6 +39,7 @@ class ClassRegressor():
         y = np.array(y)
 
         bin_edges = bins_calc(y, n_bins=self.n_bins, method=self.bins_calc_method)
+        self.bin_borders = np.zeros((len(bin_edges) - 1, 2))
 
         for i in range(len(bin_edges) - 1):
             self.bin_borders[i] = np.array([bin_edges[i], bin_edges[i+1]])
