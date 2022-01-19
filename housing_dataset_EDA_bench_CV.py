@@ -16,7 +16,7 @@ target_name = 'median_house_value'
 
 X, y = df.drop(columns=[target_name]), df[target_name]
 
-kf = KFold(n_splits=4)
+kf = KFold(n_splits=4, shuffle=True)
 kf.get_n_splits(X)
 
 class_reg = ClassRegressorEnsemble(n_bins=2, n_levels=5, bins_calc_method='equal', leaf_size=5000, leaf_model=None)
