@@ -58,7 +58,7 @@ class ClassRegressor():
         if X.shape[1] > X.shape[0]:
             self.model = DummyClassifier(strategy='most_frequent')
         else:
-            self.model = LogisticRegression()
+            self.model = LogisticRegression(n_jobs=1)
         self.model.fit(X, self.y_classes)
 
         return self
@@ -133,7 +133,7 @@ class ClassRegressorOnelevel():
         if X.shape[1] > X.shape[0]:
             self.model = DummyClassifier(strategy='most_frequent')
         else:
-            self.model = LogisticRegression()
+            self.model = LogisticRegression(n_jobs=1)
 
         self.model.fit(X, self.y_classes)
 

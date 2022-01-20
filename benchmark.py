@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import scipy.stats
 from sklearn.dummy import DummyRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from tqdm.auto import tqdm
-from sklearn.model_selection import KFold, RandomizedSearchCV
+from sklearn.model_selection import KFold, RandomizedSearchCV, train_test_split
 from sklearn.metrics import mean_absolute_error, make_scorer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -19,30 +21,24 @@ def load_dataframe():
     return df
 
 
-def run_benchmark(X, y, model, hparam_space, search_n_iter=10):
-    fold_scores = []
-    kf = KFold(n_splits=4, shuffle=True)
-    for train_index, test_index in kf.split(X):
-        X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
-        y_train, y_test = y[train_index], y[test_index]
+def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_n_iter=10):
+    search = RandomizedSearchCV(model,
+                                cv=KFold(n_splits=4),
+                                param_distributions=hparam_space,
+                                scoring=make_scorer(mean_absolute_error),
+                                verbose=8,
+                                n_jobs=4,
+                                n_iter=search_n_iter)
+    search.fit(train_X, train_Y)
+    pred_test = search.predict(test_X)
 
-        search = RandomizedSearchCV(model,
-                                    cv=KFold(n_splits=3),
-                                    param_distributions=hparam_space,
-                                    scoring=make_scorer(mean_absolute_error),
-                                    verbose=1,
-                                    n_iter=search_n_iter)
-        search.fit(X_train, y_train)
-        pred_test = search.predict(X_test)
-
-        mae = mean_absolute_error(y_test, pred_test)
-        fold_scores.append(mae)
+    mae = mean_absolute_error(test_Y, pred_test)
 
     benchmark_result = {
-        'fold_scores': fold_scores,
-        'mean_score': np.mean(fold_scores),
-        'std_score': np.std(fold_scores),
+        'best_params': search.best_params_,
+        'score': mae,
     }
+    print(benchmark_result)
     return benchmark_result
 
 
@@ -50,6 +46,7 @@ def run_benchmarks():
     df = load_dataframe()
     target_name = 'median_house_value'
     X, y = df.drop(columns=[target_name]), df[target_name]
+    train_X, test_X, train_Y, test_Y = train_test_split(X, y)
 
     pipelines = [
         Pipeline([
@@ -83,15 +80,15 @@ def run_benchmarks():
             'model__leaf_model_cls': [DummyRegressor, LinearRegression],
         },
         {
-            'model__alpha': np.random.uniform(0, 1),
-            'model__l1_ratio': np.random.normal(0.5, 1),
+            'model__alpha': scipy.stats.norm(0, 1),
+            'model__l1_ratio': scipy.stats.norm(0.5, 1),
         },
 
     ]
 
     results = {}
     for model, hparam_space in tqdm(zip(pipelines, hparam_spaces), total=len(pipelines)):
-        results[model.named_steps.model.__class__.__name__] = run_benchmark(X, y, model, hparam_space)
+        results[model.named_steps.model.__class__.__name__] = run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space)
 
     return results
 

@@ -38,7 +38,6 @@ class ClassRegressorEnsemble():
 
         y_uniq = len(np.unique(y))
 
-        print(level, len(y), y_uniq)
         if (level >= self.n_levels) or (len(y) < self.leaf_size) or (y_uniq < self.n_bins) or (y_uniq < 2):
             return
 
