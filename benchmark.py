@@ -80,7 +80,7 @@ def run_benchmarks():
             'model__leaf_model_cls': [DummyRegressor, LinearRegression],
         },
         {
-            'model__alpha': scipy.stats.norm(0, 1),
+            'model__alpha': scipy.stats.norm(0.5, 1),
             'model__l1_ratio': scipy.stats.norm(0.5, 1),
         },
 
