@@ -9,6 +9,9 @@ from lightgbm import LGBMRegressor
 
 from regression_classifier import *
 
+# Dataset link:
+# https://www.kaggle.com/camnugent/california-housing-prices?select=housing.csv
+
 df = pd.read_csv('./data/housing.csv')
 df = df.dropna().reset_index(drop=True)
 df = pd.get_dummies(df, columns=['ocean_proximity'], prefix='ocean', drop_first=True)
