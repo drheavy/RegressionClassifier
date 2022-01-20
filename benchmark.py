@@ -1,56 +1,101 @@
 import numpy as np
 import pandas as pd
-
-from sklearn.model_selection import train_test_split, KFold
-from sklearn.metrics import mean_absolute_error
+from sklearn.dummy import DummyRegressor
+from sklearn.impute import SimpleImputer
+from tqdm.auto import tqdm
+from sklearn.model_selection import KFold, RandomizedSearchCV
+from sklearn.metrics import mean_absolute_error, make_scorer
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression
-from lightgbm import LGBMRegressor
+from sklearn.linear_model import LinearRegression, ElasticNet
 
-from regression_classifier import *
+from regression_classifier import ClassRegressorEnsemble, ClassRegressorOnelevelEnsemble
 
-df = pd.read_csv('./data/housing.csv')
-df = df.dropna().reset_index(drop=True)
-df = pd.get_dummies(df, columns=['ocean_proximity'], prefix='ocean', drop_first=True)
-target_name = 'median_house_value'
 
-X, y = df.drop(columns=[target_name]), df[target_name]
+def load_dataframe():
+    df = pd.read_csv('./data/housing.csv')
+    df = df.dropna().reset_index(drop=True)
+    df = pd.get_dummies(df, columns=['ocean_proximity'], prefix='ocean', drop_first=True)
+    return df
 
-kf = KFold(n_splits=4, shuffle=True)
-kf.get_n_splits(X)
 
-class_reg = ClassRegressorEnsemble(n_bins=2, n_levels=5, bins_calc_method='equal', leaf_size=5000, leaf_model=None)
-class_reg_onelevel = ClassRegressorOnelevelEnsemble(n_bins=20, bins_calc_method='equal')
-lin_reg = LinearRegression()
-lgbm_reg = LGBMRegressor()
-models = [class_reg, class_reg_onelevel, lin_reg, lgbm_reg]
-scaler = StandardScaler()
-
-scores = {}
-
-for model in models:
-    model_name = model.__class__.__name__
-    print(f"Scores for {model_name} model")
-
-    scores[model_name] = []
-
+def run_benchmark(X, y, model, hparam_space, search_n_iter=10):
+    fold_scores = []
+    kf = KFold(n_splits=4, shuffle=True)
     for train_index, test_index in kf.split(X):
         X_train, X_test = X.iloc[train_index, :], X.iloc[test_index, :]
         y_train, y_test = y[train_index], y[test_index]
 
-        X_train_scaled = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
-        X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+        search = RandomizedSearchCV(model,
+                                    cv=KFold(n_splits=3),
+                                    param_distributions=hparam_space,
+                                    scoring=make_scorer(mean_absolute_error),
+                                    verbose=1,
+                                    n_iter=search_n_iter)
+        search.fit(X_train, y_train)
+        pred_test = search.predict(X_test)
 
-        model.fit(X_train_scaled, y_train)
-        pred_test = model.predict(X_test_scaled)
+        mae = mean_absolute_error(y_test, pred_test)
+        fold_scores.append(mae)
 
-        mae = metrics.mean_absolute_error(y_test, pred_test)
-        print("MAE = ", np.round(mae, 3))
-        scores[model_name].append(mae)
+    benchmark_result = {
+        'fold_scores': fold_scores,
+        'mean_score': np.mean(fold_scores),
+        'std_score': np.std(fold_scores),
+    }
+    return benchmark_result
 
-print("")
 
-for model in models:
-    model_name = model.__class__.__name__
-    score_mean = np.round(np.mean(scores[model_name]), 3)
-    print(f"MAE mean for {model_name} = {score_mean}")
+def run_benchmarks():
+    df = load_dataframe()
+    target_name = 'median_house_value'
+    X, y = df.drop(columns=[target_name]), df[target_name]
+
+    pipelines = [
+        Pipeline([
+            ('inputer', SimpleImputer()),
+            ('scaler', StandardScaler()),
+            ('model', ClassRegressorEnsemble()),
+        ]),
+        Pipeline([
+            ('inputer', SimpleImputer()),
+            ('scaler', StandardScaler()),
+            ('model', ClassRegressorOnelevelEnsemble()),
+        ]),
+        Pipeline([
+            ('inputer', SimpleImputer()),
+            ('scaler', StandardScaler()),
+            ('model', ElasticNet()),
+        ]),
+    ]
+
+    hparam_spaces = [
+        {
+            'model__n_bins': [2, 5],
+            'model__n_levels': [2, 5, 10, 30],
+            'model__bin_calc_method': ['equal', 'percentile'],
+            'model__leaf_size': [10, 50, 100],
+            'model__leaf_model_cls': [DummyRegressor, LinearRegression],
+        },
+        {
+            'model__n_bins': [10, 20, 30],
+            'model__bin_calc_method': ['equal', 'percentile'],
+            'model__leaf_model_cls': [DummyRegressor, LinearRegression],
+        },
+        {
+            'model__alpha': np.random.uniform(0, 1),
+            'model__l1_ratio': np.random.normal(0.5, 1),
+        },
+
+    ]
+
+    results = {}
+    for model, hparam_space in tqdm(zip(pipelines, hparam_spaces), total=len(pipelines)):
+        results[model.named_steps.model.__class__.__name__] = run_benchmark(X, y, model, hparam_space)
+
+    return results
+
+
+if __name__ == '__main__':
+    results = run_benchmarks()
+    print(results)

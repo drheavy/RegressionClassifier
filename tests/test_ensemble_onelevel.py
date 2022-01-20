@@ -64,7 +64,7 @@ class TestOnelevelEnsemble:
         pred_train = clf.predict(X)
         train_mae = mean_absolute_error(y, pred_train)
 
-        clf_linreg = ClassRegressorOnelevelEnsemble(n_bins=10, leaf_model=LinearRegression)
+        clf_linreg = ClassRegressorOnelevelEnsemble(n_bins=10, leaf_model_cls=LinearRegression)
         clf_linreg.fit(X, y)
 
         pred_train_linreg = clf_linreg.predict(X)

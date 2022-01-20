@@ -100,7 +100,7 @@ class TestClassRegressor:
         pred_train = clf.predict(X, regression=True)
         train_mae = mean_absolute_error(y, pred_train)
 
-        clf_linreg = ClassRegressor(n_bins=5, leaf_model=LinearRegression)
+        clf_linreg = ClassRegressor(n_bins=5, leaf_model_cls=LinearRegression)
         clf_linreg.fit(X, y)
 
         pred_train_linreg = clf_linreg.predict(X, regression=True)

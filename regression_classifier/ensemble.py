@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn import metrics
+from sklearn.dummy import DummyRegressor
 
 from .class_regressor import ClassRegressor, ClassRegressorOnelevel
 
@@ -10,45 +11,40 @@ from .utils import bins_calc
 class ClassRegressorEnsemble():
     """Комплексная модель с ансамблем одноуровневых моделей классификации"""
 
-    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=1, leaf_model=None):
+    def __init__(self, n_bins=2, n_levels=2, bins_calc_method='equal', leaf_size=1, leaf_model_cls=DummyRegressor):
         """
         Инициализация
         n_bins - количество бинов, на которые делятся данные на каждом уровне
         n_levels - количество уровней деления
         bins_calc_method - метод разделения таргет-переменной на бины ('equal', 'percentile')
         leaf_size - минимальный размер листового (неделимого) бина
-        leaf_model - модель регрессора для предсказаний на листовых бинах
+        leaf_model_cls - модель регрессора для предсказаний на листовых бинах
         """
         self.n_bins = n_bins
         self.n_levels = n_levels
         self.bins_calc_method = bins_calc_method
         self.leaf_size = leaf_size
-        self.leaf_model = leaf_model
+        self.leaf_model_cls = leaf_model_cls
 
         self.models = {}
+
+    def set_params(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def _fit_recur(self, X, y, level, bin_index):
 
         bin_index_tuple = tuple(bin_index)
 
         y_uniq = len(np.unique(y))
-        leaf_model = None
-        is_leaf = False
 
-        if level >= self.n_levels-1 or len(y) < self.leaf_size or y_uniq < self.n_bins:
-            if y_uniq < 2:
-                return
+        print(level, len(y), y_uniq)
+        if (level >= self.n_levels) or (len(y) < self.leaf_size) or (y_uniq < self.n_bins) or (y_uniq < 2):
+            return
 
-            is_leaf = True
-            if self.leaf_model:
-                leaf_model = self.leaf_model
-
-        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method, leaf_model=leaf_model)
+        model = ClassRegressor(n_bins=self.n_bins, bins_calc_method=self.bins_calc_method, leaf_model_cls=self.leaf_model_cls)
         model.fit(X, y)
         self.models[(level, bin_index_tuple)] = model
-
-        if is_leaf:
-            return
 
         for i, bin_border in enumerate(model.bin_borders):
             if i > 0:
@@ -111,19 +107,23 @@ class ClassRegressorEnsemble():
 class ClassRegressorOnelevelEnsemble():
     """Комплексная модель, состоящая из ансамбля бинарных моделей классификации с переменной границей между классами"""
 
-    def __init__(self, n_bins=100, bins_calc_method='equal', leaf_model=None):
+    def __init__(self, n_bins=100, bins_calc_method='equal', leaf_model_cls=None):
         """
         Инициализация
         n_bins - количество вариантов деления даанных на два бина
         bins_calc_method - метод разделения таргет-переменной на бины ('equal', 'percentile')
-        leaf_model - модель регрессора для предсказаний на листовых бинах
+        leaf_model_cls - модель регрессора для предсказаний на листовых бинах
         """
         self.n_bins = n_bins
         self.bins_calc_method = bins_calc_method
-        self.leaf_model = leaf_model
+        self.leaf_model_cls = leaf_model_cls
 
         self.bin_edges = {}
         self.models = {}
+
+    def set_params(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def fit(self, X, y):
         """
@@ -143,7 +143,7 @@ class ClassRegressorOnelevelEnsemble():
         for bin_i, bin_border in enumerate(self.bin_edges[1:-1]):
             bin_edges = np.array([self.bin_edges[0], bin_border, self.bin_edges[-1]])
 
-            model = ClassRegressorOnelevel(bin_edges=bin_edges, leaf_model=self.leaf_model)
+            model = ClassRegressorOnelevel(bin_edges=bin_edges, leaf_model_cls=self.leaf_model_cls)
             model.fit(X, y)
             self.models[bin_i+1] = model
 
