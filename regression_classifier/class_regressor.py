@@ -51,6 +51,8 @@ class ClassRegressor():
         self.y_classes = pd.cut(y, bins=bin_edges, labels=False, include_lowest=True)
         for label, _ in enumerate(self.bin_borders):
             bin_y = y[self.y_classes == label]
+            if len(bin_y) == 0:
+                continue
             bin_X = X[self.y_classes == label]
             self.leaf_model_ex[label] = self.leaf_model_cls()
             self.leaf_model_ex[label].fit(bin_X, bin_y)
