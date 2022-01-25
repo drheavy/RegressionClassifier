@@ -10,6 +10,7 @@ from sklearn.metrics import mean_absolute_error, make_scorer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, ElasticNet
+from lightgbm import LGBMRegressor
 
 from regression_classifier import ClassRegressorEnsemble, ClassRegressorOnelevelEnsemble
 
@@ -21,11 +22,11 @@ def load_dataframe():
     return df
 
 
-def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_n_iter=10):
+def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_n_iter=30):
     search = RandomizedSearchCV(model,
                                 cv=KFold(n_splits=4),
                                 param_distributions=hparam_space,
-                                scoring=make_scorer(mean_absolute_error),
+                                scoring='neg_mean_absolute_error',
                                 verbose=8,
                                 n_jobs=4,
                                 n_iter=search_n_iter)
@@ -64,6 +65,11 @@ def run_benchmarks():
             ('scaler', StandardScaler()),
             ('model', ElasticNet()),
         ]),
+        Pipeline([
+            ('inputer', SimpleImputer()),
+            ('scaler', StandardScaler()),
+            ('model', LGBMRegressor()),
+        ]),
     ]
 
     hparam_spaces = [
@@ -77,11 +83,16 @@ def run_benchmarks():
         {
             'model__n_bins': [10, 20, 30],
             'model__bin_calc_method': ['equal', 'percentile'],
-            'model__leaf_model_cls': [DummyRegressor, LinearRegression],
+            'model__leaf_model_cls': [DummyRegressor, LinearRegression, None],
         },
         {
             'model__alpha': scipy.stats.norm(0.5, 1),
-            'model__l1_ratio': scipy.stats.norm(0.5, 1),
+            'model__l1_ratio': scipy.stats.norm(0.5, 0.15),
+        },
+        {
+            'model__max_depth': np.arange(-1, 20, 2),
+            'model__subsample': np.arange(0.2, 1.2, 0.2),
+            'model__n_estimators': np.arange(10, 310, 40),
         },
 
     ]
