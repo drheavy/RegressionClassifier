@@ -1,3 +1,4 @@
+import pytest
 from sklearn.dummy import DummyRegressor
 from sklearn.metrics import mean_absolute_error
 
@@ -5,11 +6,12 @@ from regression_classifier import ClassRegressorEnsemble
 
 
 class TestEnsemble:
-    def test_fit_two_bins_two_levels(self):
+    @pytest.mark.parametrize("bins_calc_method", ['equal', 'percentile'])
+    def test_fit_two_bins_two_levels(self, bins_calc_method):
         X = [[1], [2], [3], [4]]
         y = [1, 2, 3, 4]
 
-        model = ClassRegressorEnsemble(n_bins=2, n_levels=2)
+        model = ClassRegressorEnsemble(n_bins=2, n_levels=2, bins_calc_method=bins_calc_method)
 
         model.fit(X, y)
 
@@ -21,9 +23,10 @@ class TestEnsemble:
 
         assert model.predict(X).tolist() == y
 
-    def test_better_than_dummy(self, airbnb_split):
+    @pytest.mark.parametrize("bins_calc_method", ['equal', 'percentile'])
+    def test_better_than_dummy(self, airbnb_split, bins_calc_method):
         X_train_scaled, X_test_scaled, y_train, y_test = airbnb_split
-        model = ClassRegressorEnsemble(n_bins=2, n_levels=2)
+        model = ClassRegressorEnsemble(n_bins=2, n_levels=2, bins_calc_method=bins_calc_method)
         model.fit(X_train_scaled, y_train)
 
         pred_train = model.predict(X_train_scaled)
@@ -42,9 +45,10 @@ class TestEnsemble:
         assert train_mae <= dummy_train_mae
         assert test_mae <= dummy_test_mae
 
-    def test_fit_many_levels_better_than_dummy(self, airbnb_split):
+    @pytest.mark.parametrize("bins_calc_method", ['equal', 'percentile'])
+    def test_fit_many_levels_better_than_dummy(self, airbnb_split, bins_calc_method):
         X_train_scaled, X_test_scaled, y_train, y_test = airbnb_split
-        model = ClassRegressorEnsemble(n_bins=2, n_levels=4)
+        model = ClassRegressorEnsemble(n_bins=2, n_levels=4, bins_calc_method=bins_calc_method)
         model.fit(X_train_scaled, y_train)
 
         assert len(model.models) == 1 + 2 + 2*2 + 4*2
