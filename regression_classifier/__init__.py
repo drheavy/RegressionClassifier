@@ -1,3 +1,2 @@
-from .class_regressor import ClassRegressor, ClassRegressorOnelevel
-from .ensemble import ClassRegressorEnsemble, ClassRegressorOnelevelEnsemble
+from .recursive_class_regressor import ClassRegressorSplit, ClassRegressorTree, RecursiveClassRegressor
 from .utils import *

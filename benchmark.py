@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import scipy.stats
@@ -10,9 +12,10 @@ from sklearn.metrics import mean_absolute_error, make_scorer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, ElasticNet
+from sklearn.ensemble import GradientBoostingRegressor
 from lightgbm import LGBMRegressor
 
-from regression_classifier import ClassRegressorEnsemble, ClassRegressorOnelevelEnsemble
+from regression_classifier import RecursiveClassRegressor
 
 
 def load_dataframe():
@@ -22,7 +25,7 @@ def load_dataframe():
     return df
 
 
-def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_n_iter=30):
+def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_n_iter=50):
     search = RandomizedSearchCV(model,
                                 cv=KFold(n_splits=4),
                                 param_distributions=hparam_space,
@@ -40,7 +43,7 @@ def run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space, search_
         'score': mae,
     }
     print(benchmark_result)
-    return benchmark_result
+    return search, benchmark_result
 
 
 def run_benchmarks():
@@ -53,12 +56,7 @@ def run_benchmarks():
         Pipeline([
             ('inputer', SimpleImputer()),
             ('scaler', StandardScaler()),
-            ('model', ClassRegressorEnsemble()),
-        ]),
-        Pipeline([
-            ('inputer', SimpleImputer()),
-            ('scaler', StandardScaler()),
-            ('model', ClassRegressorOnelevelEnsemble()),
+            ('model', RecursiveClassRegressor()),
         ]),
         Pipeline([
             ('inputer', SimpleImputer()),
@@ -68,42 +66,48 @@ def run_benchmarks():
         Pipeline([
             ('inputer', SimpleImputer()),
             ('scaler', StandardScaler()),
+            ('model', GradientBoostingRegressor()),
+        ]),
+        Pipeline([
+            ('inputer', SimpleImputer()),
+            ('scaler', StandardScaler()),
             ('model', LGBMRegressor()),
         ]),
     ]
 
     hparam_spaces = [
-        {
-            'model__n_bins': [2, 5],
-            'model__n_levels': [2, 5, 10, 30],
-            'model__bin_calc_method': ['equal', 'percentile'],
+        { # RecursiveClassRegressor
+            'model__n_bins': [2, 3, 5],
+            'model__n_splits': [2, 3, 5, 10],
+            'model__bins_calc_method': ['equal', 'percentile'],
             'model__leaf_size': [10, 50, 100],
-            'model__leaf_model_cls': [DummyRegressor, LinearRegression],
+            'model__leaf_model_cls_name': ['DummyRegressor', 'LinearRegression'],
         },
-        {
-            'model__n_bins': [10, 20, 30],
-            'model__bin_calc_method': ['equal', 'percentile'],
-            'model__leaf_model_cls': [DummyRegressor, LinearRegression, None],
-        },
-        {
+        { # ElasticNet
             'model__alpha': scipy.stats.norm(0.5, 1),
             'model__l1_ratio': scipy.stats.norm(0.5, 0.15),
         },
-        {
-            'model__max_depth': np.arange(-1, 20, 2),
-            'model__subsample': np.arange(0.2, 1.2, 0.2),
-            'model__n_estimators': np.arange(10, 310, 40),
-        },
-
+        # {  # GradientBoostingRegressor
+        #     'model__max_depth': np.arange(-1, 20, 2),
+        #     'model__subsample': np.arange(0.2, 1.2, 0.2),
+        #     'model__n_estimators': np.arange(10, 310, 40),
+        # },
+        # { # LGBMRegressor
+        #     'model__max_depth': np.arange(-1, 20, 2),
+        #     'model__subsample': np.arange(0.2, 1.2, 0.2),
+        #     'model__n_estimators': np.arange(10, 310, 40),
+        # },
     ]
 
+    searches = {}
     results = {}
     for model, hparam_space in tqdm(zip(pipelines, hparam_spaces), total=len(pipelines)):
-        results[model.named_steps.model.__class__.__name__] = run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space)
+        model_name = model.named_steps.model.__class__.__name__
+        searches[model_name], results[model_name] = run_benchmark(train_X, test_X, train_Y, test_Y, model, hparam_space)
 
-    return results
+    return searches, results
 
 
 if __name__ == '__main__':
-    results = run_benchmarks()
-    print(results)
+    searches, results = run_benchmarks()
+    print(json.dumps(results, sort_keys=True, indent=4, default=str))
