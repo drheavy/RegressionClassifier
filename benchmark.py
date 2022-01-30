@@ -87,16 +87,16 @@ def run_benchmarks():
             'model__alpha': scipy.stats.norm(0.5, 1),
             'model__l1_ratio': scipy.stats.norm(0.5, 0.15),
         },
-        # {  # GradientBoostingRegressor
-        #     'model__max_depth': np.arange(-1, 20, 2),
-        #     'model__subsample': np.arange(0.2, 1.2, 0.2),
-        #     'model__n_estimators': np.arange(10, 310, 40),
-        # },
-        # { # LGBMRegressor
-        #     'model__max_depth': np.arange(-1, 20, 2),
-        #     'model__subsample': np.arange(0.2, 1.2, 0.2),
-        #     'model__n_estimators': np.arange(10, 310, 40),
-        # },
+        {  # GradientBoostingRegressor
+            'model__max_depth': np.arange(-1, 20, 2),
+            'model__subsample': np.arange(0.2, 1.2, 0.2),
+            'model__n_estimators': np.arange(10, 310, 40),
+        },
+        { # LGBMRegressor
+            'model__max_depth': np.arange(-1, 20, 2),
+            'model__subsample': np.arange(0.2, 1.2, 0.2),
+            'model__n_estimators': np.arange(10, 310, 40),
+        },
     ]
 
     searches = {}
