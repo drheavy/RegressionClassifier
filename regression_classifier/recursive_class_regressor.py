@@ -4,6 +4,8 @@ from sklearn.base import BaseEstimator, RegressorMixin, ClassifierMixin
 from sklearn.dummy import DummyClassifier, DummyRegressor
 
 from sklearn.linear_model import LogisticRegression, LinearRegression
+from numba import njit, prange, jit
+
 from .utils import bins_calc
 
 
@@ -97,6 +99,23 @@ class ClassRegressorTree(BaseEstimator, RegressorMixin):
                 leaf_size=self.leaf_size,
             )
 
+    @jit(parallel=True, nopython=False, forceobj=True)
+    def fit_child_models(self, X, y):
+        for i in prange(len(self.split.bin_borders)):
+            bin_border = self.split.bin_borders[i]
+            if i > 0:
+                bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
+            else:
+                bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
+
+            X_subset, y_subset = X[bin_idx], y[bin_idx]
+            if len(y_subset) == 0:
+                continue
+
+            child_model = self.get_child_model(X_subset, y_subset)
+            child_model.fit(X_subset, y_subset)
+            self.child_models[i] = child_model
+
     def fit(self, X, y):
         if isinstance(X, pd.DataFrame):
             X = X.values
@@ -113,32 +132,24 @@ class ClassRegressorTree(BaseEstimator, RegressorMixin):
         split_model.fit(X, y)
         self.split = split_model
 
-        for i, bin_border in enumerate(self.split.bin_borders):
-            if i > 0:
-                bin_idx = (y > bin_border[0]) & (y <= bin_border[1])
-            else:
-                bin_idx = (y >= bin_border[0]) & (y <= bin_border[1])
+        self.fit_child_models(X, y)
 
-            X_subset, y_subset = X[bin_idx], y[bin_idx]
-            if len(y_subset) == 0:
-                continue
-
-            child_model = self.get_child_model(X_subset, y_subset)
-            child_model.fit(X_subset, y_subset)
-            self.child_models[i] = child_model
+    @jit(nopython=False, parallel=True, forceobj=True)
+    def get_child_model_preds(self, X, proba):
+        preds = np.zeros((len(X),))
+        for bin_i in prange(len(self.child_models)):
+            child_model = self.child_models[bin_i]
+            child_prediction = child_model.predict(X)
+            preds += proba[:, bin_i] * child_prediction
+        return preds
 
     def predict(self, X, classification=False):
-
         proba = self.split.predict_proba(X)
         pred = np.argmax(proba, axis=1)
         if classification:
             return pred, proba
 
-        preds = np.zeros((len(X),))
-        for bin_i, child_model in self.child_models.items():
-            child_prediction = child_model.predict(X)
-            preds += proba[:, bin_i] * child_prediction
-        return preds
+        return self.get_child_model_preds(X, proba)
 
 
 class RecursiveClassRegressor(BaseEstimator, RegressorMixin):
